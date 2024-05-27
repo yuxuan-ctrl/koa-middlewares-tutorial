@@ -3,7 +3,7 @@ import Redisdb from "ioredis";
 
 export default class Redis {
   config: { port: number; host: string; db: number };
-  client: any;
+  client: Redisdb;
   options: { client: any; db: number };
   store: any;
   lockLeaseTime: any;
@@ -49,6 +49,18 @@ export default class Redis {
 
   async hmget(key: string) {
     return this.client.hgetall(key);
+  }
+
+  async zadd(key: string, value: any) {
+    return this.client.zadd(key, value);
+  }
+
+  async zcard(key: string) {
+    return this.client.zcard(key);
+  }
+
+  async zincrby(key: string, value: any) {
+    return this.client.zincrby(key, 1, value);
   }
 
   async getAllKey() {
