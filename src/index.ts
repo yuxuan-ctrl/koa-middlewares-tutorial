@@ -24,7 +24,7 @@ app.keys = ["secretkeys"];
 app.use(
   session(
     {
-      key: "SID",
+      key: "sessionID",
       store: redisStore({
         client: _redis.client,
       }),
@@ -52,7 +52,7 @@ useKoaServer(app, {
   },
   routePrefix: "/api",
   controllers: [path.join(__dirname, "/controllers/**/*.ts")],
-  //   middlewares: Handler,
+  middlewares: [path.join(__dirname, "/middlewares/**/*.ts")],
   defaultErrorHandler: false,
   authorizationChecker: async (action: Action, roles?: string[]) => {
     return true;

@@ -11,25 +11,64 @@ import {
   QueryParam,
   Ctx,
 } from "routing-controllers";
-import Logger from "log4js";
+import jwt from "jsonwebtoken";
+import MD5 from "../utils/md5";
 import RankingListDto from "../dto/rankingListDto";
 import DistributedLockDto from "../dto/distributedLockDto";
+import LoginDto from "../dto/loginDto";
+import { secret } from "../config/jwtConfig";
+
+const userInfo = {
+  userName: "testuser",
+  password: MD5("testpassword"),
+};
 
 @Controller("/redis")
 export default class RedisController {
   _redis = new Redis();
 
   // 实现Session存储
-  @Get("/setSession")
-  public async setSession(
-    @QueryParam("name") name: string,
-    @Ctx() ctx: Context
-  ) {
-    // global.logger.info(ctx.session);
-    global.logger.info(ctx.session);
-    ctx.session!.name = name as string;
+  @Post("/login")
+  public async login(@Body() loginDto: LoginDto, @Ctx() ctx: Context) {
+    if (ctx.session?.userInfo) {
+      return "用户已登录";
+    }
+    if (MD5(loginDto.password) === userInfo.password) {
+      ctx.session!.userInfo = {
+        username: loginDto.username,
+        password: MD5(loginDto.password),
+      };
+      global.logger.info(ctx.session);
+    } else {
+      return "暂无此账号";
+    }
 
-    return ctx.session!.name;
+    return ctx.session!.username;
+  }
+
+  // 实现Jwt存储
+  @Post("/loginUseJwt")
+  public async loginUseJwt(@Body() loginDto: LoginDto, @Ctx() ctx: Context) {
+    // const oldUserInfo = await this._redis.client.get(
+    //   "userInfo:" + loginDto.username
+    // );
+
+    // if (oldUserInfo) {
+    //   return oldUserInfo;
+    // }
+
+    if (MD5(loginDto.password) === userInfo.password) {
+      this._redis.client.set(
+        "userInfo:" + loginDto.username,
+        JSON.stringify(userInfo),
+        "EX",
+        20000
+      );
+      const token = jwt.sign(Object.assign({}, loginDto), Buffer.from(secret), {
+        expiresIn: "3h",
+      });
+      return token;
+    }
   }
 
   @Post("/setRankingList")
