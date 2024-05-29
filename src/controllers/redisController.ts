@@ -167,6 +167,47 @@ export default class RedisController {
     }, 10000);
   }
 
+  @Get("/useMessageQueue")
+  public async useMessageQueue() {
+    const processMessage = (message: any) => {
+      console.log("Id: %s. Data: %O", message[0], message[1]);
+    };
+
+    await this._redis.client.xadd(
+      "mystream",
+      "*",
+      "randomValue",
+      Math.random()
+    );
+    console.log("Message added to stream.");
+
+    // const range = await this._redis.client.xrange("mystream", "*", "$");
+
+    // global.logger.info(range);
+
+    try {
+      // 现在开始尝试读取消息，设置合理的阻塞时间，例如5秒
+      const result = await this._redis.client.xread(
+        "BLOCK",
+        0,
+        "STREAMS",
+        "mystream",
+        "$"
+      );
+      if (result && result.length > 0) {
+        const [key, messages] = result[0];
+        messages.forEach(processMessage);
+        return messages;
+      } else {
+        console.log("No messages available within the blocking period.");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error reading from stream:", error);
+      throw error;
+    }
+  }
+
   /**
    * 创建一个分布式锁并自动续期，最终释放锁
    * @Post decorator 定义了这是一个HTTP POST请求的处理函数
