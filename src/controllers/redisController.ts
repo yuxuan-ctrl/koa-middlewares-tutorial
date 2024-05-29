@@ -12,6 +12,7 @@ import {
   Ctx,
 } from "routing-controllers";
 import jwt from "jsonwebtoken";
+import IoRedis from "ioredis";
 import MD5 from "../utils/md5";
 import RankingListDto from "../dto/rankingListDto";
 import DistributedLockDto from "../dto/distributedLockDto";
@@ -97,6 +98,73 @@ export default class RedisController {
     }, []);
 
     return formattedResult;
+  }
+
+  @Get("/usePubSub")
+  public async usePubSub() {
+    const sub = new IoRedis();
+    const pub = new IoRedis();
+
+    sub.subscribe("my-channel-1", (err, count) => {
+      if (err) {
+        // Just like other commands, subscribe() can fail for some reasons,
+        // ex network issues.
+        console.error("Failed to subscribe: %s", err.message);
+      } else {
+        // `count` represents the number of channels this client are currently subscribed to.
+        console.log(
+          `Subscribed successfully! This client is currently subscribed to ${count} channels.`
+        );
+      }
+    }); // From now, `sub` enters the subscriber mode.
+
+    sub.on("message", (channel, message) => {
+      console.log(`Received ${message} from ${channel}`);
+    });
+
+    setTimeout(() => {
+      // `pub` can be used to publish messages, or send other regular commands (e.g. `hgetall`)
+      // because it's not in the subscriber mode.
+      pub.publish("my-channel-1", "testMessage");
+    }, 1000);
+  }
+
+  @Get("/usePipeLine")
+  public async usePipeLine() {
+    // `exec` also returns a Promise:
+    const promise = this._redis.client
+      .pipeline()
+      .set("foo", "bar")
+      .get("foo")
+      .exec();
+    promise.then((result) => {
+      console.log("🚀 ~ RedisController ~ promise.then ~ result:", result);
+      //🚀 ~ RedisController ~ promise.then ~ result: [ [ null, 'OK' ], [ null, 'bar' ] ]
+    });
+  }
+
+  @Get("/useTransation")
+  public async useTransation() {
+    // `exec` also returns a Promise:
+    const promise = this._redis.client
+      .multi()
+      .set("foo", "bar")
+      .get("foo")
+      .exec();
+    promise.then((result) => {
+      console.log("🚀 ~ RedisController ~ promise.then ~ result:", result);
+      //🚀 ~ RedisController ~ promise.then ~ result: [ [ null, 'OK' ], [ null, 'bar' ] ]
+    });
+  }
+
+  @Get("/useMonitor")
+  public async useMonitor() {
+    const monitor = await this._redis.client.monitor();
+    monitor.on("monitor", console.log);
+    setTimeout(() => {
+      // 这里可以执行其他任务
+      monitor.disconnect(); // 当需要停止监控时，调用disconnect
+    }, 10000);
   }
 
   /**

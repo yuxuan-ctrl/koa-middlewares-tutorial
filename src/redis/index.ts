@@ -1,8 +1,8 @@
 import redisStore from "koa-redis";
-import Redisdb from "ioredis";
+import Redisdb, { RedisOptions } from "ioredis";
 
 export default class Redis {
-  config: { port: number; host: string; db: number };
+  config: RedisOptions;
   client: Redisdb;
   options: { client: any; db: number };
   store: any;
@@ -15,6 +15,12 @@ export default class Redis {
       port: 6379,
       host: "127.0.0.1",
       db: 0,
+      showFriendlyErrorStack: true,
+      // sentinels: [ // 哨兵模式部署配置
+      //   { host: "localhost", port: 26379 },
+      //   { host: "localhost", port: 26380 },
+      // ],
+      name: "mymaster",
     };
     this.client = new Redisdb(this.config);
 
