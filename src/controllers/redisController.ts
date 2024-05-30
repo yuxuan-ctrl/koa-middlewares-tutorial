@@ -18,6 +18,7 @@ import RankingListDto from "../dto/rankingListDto";
 import DistributedLockDto from "../dto/distributedLockDto";
 import LoginDto from "../dto/loginDto";
 import { secret } from "../config/jwtConfig";
+import TrafficLimitDto from "../dto/trafficLimitDto";
 
 const userInfo = {
   userName: "testuser",
@@ -243,7 +244,7 @@ export default class RedisController {
         else
           return 0
         end`;
-        // 设置一个定时器，每3秒执行一次续期操作
+        // 设置一个定时器，每3秒执行一次续期操作,模拟WatchDog,给锁续签功能
         timer = setInterval(async () => {
           // 调用eval执行续期脚本
           const result = await this._redis.client.eval(
@@ -290,6 +291,65 @@ export default class RedisController {
       // 异常处理，例如清除定时器、记录错误日志等
       global.logger.error("An error occurred during lock handling:", error);
       throw error; // 或者根据实际情况处理错误，如返回错误信息
+    }
+  }
+
+  @Post("/setTrafficLimitUseZset")
+  public async setTrafficLimit(@Body() trafficLimitDto: TrafficLimitDto) {
+    const currentTime = new Date().getTime();
+
+    const upStreamTime = currentTime - trafficLimitDto.timeWindow;
+
+    const range = await this._redis.client.zrangebyscore(
+      trafficLimitDto.serviceId,
+      upStreamTime,
+      currentTime
+    );
+
+    if (range.length > trafficLimitDto.count) {
+      return "超过限流限制，请稍后再试";
+    }
+
+    await this._redis.client.zadd(
+      trafficLimitDto.serviceId,
+      currentTime,
+      currentTime
+    );
+
+    return "暂未到限流限制，可继续使用";
+  }
+
+  @Post("/setTrafficLimitUseTokenBucket")
+  public async setTrafficLimitUseTokenBucket(
+    @Body() trafficLimitDto: TrafficLimitDto
+  ) {
+    const self = this;
+    async function initTokenBucket(initialTokens: number) {
+      for (let i = 0; i < initialTokens; i++) {
+        await self._redis.client.rpush("tokens_bucket", "token"); // 这里用"token"代表一个令牌，实际应用中可以根据需要存储令牌的标识
+      }
+    }
+
+    // 初始化时设置10个令牌（代表空桶）或设置100个令牌
+    const hasTokenBucket = await self._redis.client.exists("tokens_bucket");
+    if (hasTokenBucket === 0) {
+      initTokenBucket(2); // 或者 initToken(10);
+    }
+
+    if (await self._redis.client.exists("hasOpenBucket")) {
+      self._redis.client.set("hasOpenBucket", "true", "EX", 100, "NX");
+      setInterval(() => {
+        self._redis.client.rpush("tokens_buck", new Date().getTime());
+      }, trafficLimitDto.timeWindow);
+    }
+
+    await self._redis.client.lpop("tokens_bucket");
+    const length = (await self._redis.client.lrange("tokens_bucket", 0, -1)!)
+      .length;
+    if (length <= 0) {
+      return "限流了...请稍后再试";
+    } else {
+      return "没限流，通过了";
     }
   }
 }
