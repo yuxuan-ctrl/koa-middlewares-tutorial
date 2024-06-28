@@ -19,6 +19,7 @@ import DistributedLockDto from "../dto/distributedLockDto";
 import LoginDto from "../dto/loginDto";
 import { secret } from "../config/jwtConfig";
 import TrafficLimitDto from "../dto/trafficLimitDto";
+import { Worker } from "worker_threads";
 
 const userInfo = {
   userName: "testuser",
@@ -51,14 +52,6 @@ export default class RedisController {
   // 实现Jwt存储
   @Post("/loginUseJwt")
   public async loginUseJwt(@Body() loginDto: LoginDto, @Ctx() ctx: Context) {
-    // const oldUserInfo = await this._redis.client.get(
-    //   "userInfo:" + loginDto.username
-    // );
-
-    // if (oldUserInfo) {
-    //   return oldUserInfo;
-    // }
-
     if (MD5(loginDto.password) === userInfo.password) {
       this._redis.client.set(
         "userInfo:" + loginDto.username,
@@ -174,23 +167,16 @@ export default class RedisController {
       console.log("Id: %s. Data: %O", message[0], message[1]);
     };
 
-    await this._redis.client.xadd(
-      "mystream",
-      "*",
-      "randomValue",
-      Math.random()
-    );
-    console.log("Message added to stream.");
-
-    // const range = await this._redis.client.xrange("mystream", "*", "$");
-
-    // global.logger.info(range);
+    // 由于同异步问题，利用多线程解决异步问题
+    new Worker("./src/threads/xadd.js");
 
     try {
       // 现在开始尝试读取消息，设置合理的阻塞时间，例如5秒
       const result = await this._redis.client.xread(
+        "COUNT",
+        1,
         "BLOCK",
-        0,
+        8000,
         "STREAMS",
         "mystream",
         "$"
