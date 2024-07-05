@@ -24,6 +24,10 @@ const RPC_REPLY_EXCHANGE_NAME = "rpcReplyExchange";
 const RPC_MSG_QUEUE_NAME = "recMsgQueue";
 const RPC_REPLY_QUEUE_NAME = "recReplyQueue";
 const RPC_ROUTER_KEY = "rpcRouterKey";
+const NORMAL_QUEUE_NAME = "normalQueue";
+const DEAD_LETTER_EXCHANGE_NAME = "deadLettersExchange";
+const DEAD_LETTER_QUEUE_NAME = "deadLettersQueue";
+const DEAD_LETTER_ROUTER_KEY = "deadLettersRouterKey";
 const config = {
   mqHost,
   mqPort,
@@ -50,6 +54,10 @@ const config = {
   RPC_REPLY_QUEUE_NAME,
   RPC_ROUTER_KEY,
   RPC_EXCHANGE_NAME,
+  DEAD_LETTER_EXCHANGE_NAME,
+  DEAD_LETTER_QUEUE_NAME,
+  DEAD_LETTER_ROUTER_KEY,
+  NORMAL_QUEUE_NAME,
 };
 
 export default config;

@@ -113,7 +113,7 @@ export default class RabbitMqController {
     for (let i = 0; i < 50; i++) {
       channel.publish(
         RabbitConfig.FANOUT_EXCHANGE_NAME,
-        RabbitConfig.routingKey, //
+        "", //
         Buffer.from(message + i)
       );
     }
@@ -194,28 +194,26 @@ export default class RabbitMqController {
       durable: true,
     });
 
-    for (let i = 0; i < 3; i++) {
-      channel.publish(
-        RabbitConfig.TOPIC_EXCHANGE_NAME,
-        "www.abc.com", //
-        Buffer.from("www.abc.com" + "----------------" + i)
-      );
-      channel.publish(
-        RabbitConfig.TOPIC_EXCHANGE_NAME,
-        "www.efg", //
-        Buffer.from("www.efg" + "----------------" + i)
-      );
-      channel.publish(
-        RabbitConfig.TOPIC_EXCHANGE_NAME,
-        "hij.com", //
-        Buffer.from("hij.com" + "----------------" + i)
-      );
-      channel.publish(
-        RabbitConfig.TOPIC_EXCHANGE_NAME,
-        "klm", //
-        Buffer.from("klm" + "----------------" + i)
-      );
-    }
+    channel.publish(
+      RabbitConfig.TOPIC_EXCHANGE_NAME,
+      "www.abc.com", //
+      Buffer.from("www.abc.com" + "----------------")
+    );
+    channel.publish(
+      RabbitConfig.TOPIC_EXCHANGE_NAME,
+      "www.efg", //
+      Buffer.from("www.efg" + "----------------")
+    );
+    channel.publish(
+      RabbitConfig.TOPIC_EXCHANGE_NAME,
+      "hij.com", //
+      Buffer.from("hij.com" + "----------------")
+    );
+    channel.publish(
+      RabbitConfig.TOPIC_EXCHANGE_NAME,
+      "klm", //
+      Buffer.from("klm" + "----------------")
+    );
   }
 
   @Get("/topicModeConsumer")
@@ -247,9 +245,9 @@ export default class RabbitMqController {
         const message = msg?.content.toLocaleString();
         global.logger.info(
           message +
-            "-------------" +
+            "-------" +
             RabbitConfig.TOPIC_ROUTERKEY1 +
-            "-------------" +
+            "-------" +
             RabbitConfig.TOPIC_QUEUE_NAME1
         );
       },
@@ -261,9 +259,9 @@ export default class RabbitMqController {
         const message = msg?.content.toLocaleString();
         global.logger.info(
           message +
-            "-------------" +
+            "-----" +
             RabbitConfig.TOPIC_ROUTERKEY2 +
-            "-------------" +
+            "------" +
             RabbitConfig.TOPIC_QUEUE_NAME2
         );
       },
@@ -372,6 +370,54 @@ export default class RabbitMqController {
       {
         noAck: true,
       }
+    );
+  }
+
+  @Get("/deadletterProvider")
+  public async deadletterProvider() {
+    channel.assertExchange(RabbitConfig.DEAD_LETTER_EXCHANGE_NAME, "direct", {
+      durable: true,
+    });
+    channel.assertQueue(RabbitConfig.DEAD_LETTER_QUEUE_NAME, { durable: true });
+    channel.assertQueue(RabbitConfig.NORMAL_QUEUE_NAME, {
+      durable: true,
+      arguments: {
+        "x-dead-letter-exchange": "",
+        "x-dead-letter-routing-key": RabbitConfig.DEAD_LETTER_QUEUE_NAME,
+      },
+    });
+    for (let i = 0; i < 11; i++) {
+      channel.sendToQueue(
+        RabbitConfig.NORMAL_QUEUE_NAME,
+        Buffer.from(i.toString())
+      );
+    }
+    channel.consume(
+      RabbitConfig.DEAD_LETTER_QUEUE_NAME,
+      (msg) => {
+        global.logger.info(msg?.content.toLocaleString());
+      },
+      { noAck: true }
+    );
+  }
+
+  @Get("/deadletterConsumer")
+  public async deadletterConsumer() {
+    channel.consume(
+      RabbitConfig.NORMAL_QUEUE_NAME,
+      (msg) => {
+        const content = msg!.content.toString();
+        console.log(`Received: ${content}`);
+        try {
+          // 模拟处理逻辑，这里假设偶数消息处理失败
+          if (Number(content) % 2 === 0) throw new Error("Processing failed");
+          channel.ack(msg!);
+        } catch (error: any) {
+          console.error(`Failed to process message: ${error.message}`);
+          channel.nack(msg!, false, false); // 不重新入队列
+        }
+      },
+      { noAck: false }
     );
   }
 
