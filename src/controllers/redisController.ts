@@ -68,18 +68,25 @@ export default class RedisController {
 
   @Post("/setRankingList")
   public async setRankingList(@Body() RankingList: RankingListDto[]) {
+    console.log(
+      RankingList.flatMap((ranking) => [ranking.score, ranking.name])
+    );
     this._redis.client.zadd(
       "分数排行榜",
       ...RankingList.flatMap((ranking) => [ranking.score, ranking.name]) // 使用flatMap扁平化数组并配对分数和名字
     );
 
+    //     "分数排行榜"：有序集合的键名。
+    // 0：起始索引，0表示从第一个元素开始。
+    // -1：结束索引，-1表示直到最后一个元素。
+    // "WITHSCORES"：选项，指示返回每个成员及其对应的分数。
     const redisResult = await this._redis.client.zrevrange(
       "分数排行榜",
       0,
       -1,
       "WITHSCORES"
     );
-
+    // ['lyx1', '21', 'lyx', '20', 'lyx3', '4', 'lyx2', '3']
     const formattedResult = redisResult.reduce((acc: any, value, index) => {
       if (index % 2 === 0) {
         // 偶数索引表示member
@@ -319,18 +326,22 @@ export default class RedisController {
     // 初始化时设置10个令牌（代表空桶）或设置100个令牌
     const hasTokenBucket = await self._redis.client.exists("tokens_bucket");
     if (hasTokenBucket === 0) {
-      initTokenBucket(2); // 或者 initToken(10);
+      initTokenBucket(0); // 或者 initToken(10);
     }
 
-    if (await self._redis.client.exists("hasOpenBucket")) {
-      self._redis.client.set("hasOpenBucket", "true", "EX", 100, "NX");
+    const locked = await self._redis.client.exists("hasOpenBucket");
+    if (locked == 0) {
+      self._redis.client.set("hasOpenBucket", "true", "NX");
       setInterval(() => {
-        self._redis.client.rpush("tokens_buck", new Date().getTime());
+        self._redis.client.rpush("tokens_bucket", new Date().getTime());
       }, trafficLimitDto.timeWindow);
     }
+  }
 
-    await self._redis.client.lpop("tokens_bucket");
-    const length = (await self._redis.client.lrange("tokens_bucket", 0, -1)!)
+  @Get("/getTokens")
+  public async getTokens() {
+    const token = await this._redis.client.lpop("tokens_bucket");
+    const length = (await this._redis.client.lrange("tokens_bucket", 0, -1)!)
       .length;
     if (length <= 0) {
       return "限流了...请稍后再试";
