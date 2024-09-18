@@ -42,7 +42,7 @@ export default class PrismaBaseController {
         },
         where: {
           name: {
-            equals: "lyx",
+            // equals: "lyx",
           },
         },
         orderBy: {
@@ -67,7 +67,7 @@ export default class PrismaBaseController {
         },
         where: {
           name: {
-            equals: "lyx",
+            // equals: "lyx",
           },
         },
         skip: 1,

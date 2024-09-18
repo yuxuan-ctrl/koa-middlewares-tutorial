@@ -108,9 +108,11 @@ const Mutation = objectType({
         ),
       },
       resolve: (_, args, context: Context) => {
-        const postData = args.data.posts?.map((post) => {
-          return { title: post.title, content: post.content || undefined };
-        });
+        const postData = args.data.posts?.map(
+          (post: { title: any; content: any }) => {
+            return { title: post.title, content: post.content || undefined };
+          }
+        );
         return context.prisma.user.create({
           data: {
             name: args.data.name,
@@ -171,22 +173,22 @@ const Mutation = objectType({
       },
     });
 
-    t.field("incrementPostViewCount", {
-      type: "Post",
-      args: {
-        id: nonNull(intArg()),
-      },
-      resolve: (_, args, context: Context) => {
-        return context.prisma.post.update({
-          where: { id: args.id || undefined },
-          data: {
-            viewCount: {
-              increment: 1,
-            },
-          },
-        });
-      },
-    });
+    // t.field("incrementPostViewCount", {
+    //   type: "Post",
+    //   args: {
+    //     id: nonNull(intArg()),
+    //   },
+    //   resolve: (_, args, context: Context) => {
+    //     return context.prisma.post.update({
+    //       where: { id: args.id || undefined },
+    //       data: {
+    //         viewCount: {
+    //           increment: 1,
+    //         },
+    //       },
+    //     });
+    //   },
+    // });
 
     t.field("deletePost", {
       type: "Post",
